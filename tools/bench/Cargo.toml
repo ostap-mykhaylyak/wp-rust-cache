@@ -1,0 +1,12 @@
+[package]
+name = "wprc-bench"
+description = "Engine benchmarks: multi-process throughput/latency and eviction policies on WordPress-shaped traffic"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+wprc-core = { path = "../../rust-core" }
+libc.workspace = true

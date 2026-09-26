@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+configure)
+    if [ -z "$2" ]; then
+        cat <<'EOF'
+wp-rust-cache is installed but not enabled. For each WordPress site:
+
+  wp-rust-cache install --wp /var/www/html --user www-data
+
+then reload PHP-FPM.
+EOF
+    else
+        # Upgrade: sites enabled with the packaged extension pick up the new
+        # build when PHP-FPM reloads. Not done here: when to reload a web
+        # server is the administrator's call.
+        if ls /etc/php/*/mods-available/wp_rust_cache.ini >/dev/null 2>&1; then
+            echo "wp-rust-cache upgraded: reload PHP-FPM to load the new extension (e.g. systemctl reload php8.4-fpm)."
+        fi
+    fi
+    ;;
+esac
+
+exit 0

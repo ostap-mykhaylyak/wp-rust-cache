@@ -1,0 +1,10 @@
+[cache]
+enabled = true
+memory = "512MB"
+shards = 64
+eviction = "tinylfu"
+
+[shared_memory]
+path = "/dev/shm/wp-rust-cache"
+permissions = "0600"
+owner = "www-data"

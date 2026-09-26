@@ -1,0 +1,18 @@
+Package: wp-rust-cache
+Version: @VERSION@
+Section: web
+Priority: optional
+Architecture: @ARCH@
+Installed-Size: @SIZE@
+Depends: libc6 (>= 2.36)
+Recommends: php-fpm | php-cli
+Maintainer: Ostap Mykhaylyak <ostap.mykhaylyak@gmail.com>
+Homepage: https://github.com/ostap-mykhaylyak/wp-rust-cache
+Description: shared-memory object cache for WordPress
+ A persistent WordPress object cache in shared memory: PHP-FPM workers read
+ and write one segment directly through a PHP extension, with no Redis, no
+ Memcached, no network and no daemon.
+ .
+ This package ships the extension for PHP 8.2, 8.3, 8.4 and 8.5, the
+ object-cache.php drop-in and the wp-rust-cache command. Nothing is enabled
+ until you run: wp-rust-cache install --wp /path/to/wordpress

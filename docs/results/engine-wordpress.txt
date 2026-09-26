@@ -1,0 +1,10 @@
+engine benchmark · workload=wordpress · 64 shards · 256.00 MB · Lru · 12 CPUs · 3s per run
+latency = time of one Cache::get/set call measured in the worker (includes ~20ns clock overhead)
+
+workers  requests/s        ops/s  get p50  get p95  get p99  set p50  set p95  set p99   CPU/req    hit%  contended
+      1       25664      1217680    384ns    1.4µs    3.8µs    6.7µs   18.4µs   30.7µs    39.2µs   99.1%      0.00‰
+      2       41105      1944110    480ns    1.8µs    5.1µs    6.7µs   18.4µs   49.2µs    46.7µs   99.5%     10.67‰
+      4       65549      3093884    576ns    2.3µs   10.2µs    7.2µs   36.9µs   53.2µs    53.0µs   99.7%     27.28‰
+      8       63831      3013029    768ns    4.1µs   41.0µs   10.2µs   53.2µs   73.7µs    89.9µs   99.7%     43.74‰
+     16       58842      2778351    960ns    6.1µs  147.5µs   13.3µs   57.3µs  106.5µs   136.2µs   99.6%     55.18‰
+     32       61595      2907850    1.0µs   10.2µs  360.4µs   14.3µs   57.3µs  180.2µs   143.2µs   99.6%     61.84‰

@@ -1,0 +1,29 @@
+# /etc/wp-rust-cache/config.toml — every key is optional.
+# `wp-rust-cache install` writes a starting version sized to your /dev/shm.
+
+[cache]
+enabled = true
+# The hard limit: the segment never grows beyond it. Sizes are binary
+# (1GB = 1024MB). /dev/shm must hold it — twice during a configuration change.
+memory = "1GB"
+# Power of two. One lock per shard.
+shards = 64
+# "tinylfu" (default) or "lru". See docs/BENCHMARKS.md for the measurements.
+eviction = "tinylfu"
+# Larger values are not stored (and any older copy is removed).
+max_item_size = "8MB"
+# Percent of each shard kept in use before proactive eviction.
+soft_limit = 90
+
+[shared_memory]
+path = "/dev/shm/wp-rust-cache"
+# Bits for "other" are refused: the segment feeds unserialize().
+permissions = "0600"
+# The PHP-FPM user. Root (installer, WP-CLI as root) creates the segment on
+# its behalf and only trusts a segment owned by it.
+owner = "www-data"
+# To share one segment between pools of different users on purpose:
+# group = "wpcache" and permissions = "0660".
+# Reserve all pages at creation: a full tmpfs then fails at startup instead
+# of killing a worker with SIGBUS mid-request.
+preallocate = true

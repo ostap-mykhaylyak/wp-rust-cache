@@ -1,0 +1,13 @@
+eviction benchmark · workload=woocommerce · 150000 requests (first 20% warm-up) · 16 shards
+
+  memory   policy      hit%  misses/req  evictions   rejected      req/s
+16.00 MB      lru    70.25%       17.85    2143085          0      24027
+16.00 MB  tinylfu    73.91%       15.66     319247    1560560      30358
+32.00 MB      lru    78.89%       12.67    1521872          0      22846
+32.00 MB  tinylfu    81.40%       11.16     268853    1070894      26430
+64.00 MB      lru    87.19%        7.69     923985          0      21431
+64.00 MB  tinylfu    88.47%        6.92     250974     580120      22849
+128.00 MB      lru    94.69%        3.19     382889          0      21706
+128.00 MB  tinylfu    95.67%        2.60      58839     252664      21260
+256.00 MB      lru    98.90%        0.66      57982          0      21384
+256.00 MB  tinylfu    98.92%        0.65       9066      50323      18972

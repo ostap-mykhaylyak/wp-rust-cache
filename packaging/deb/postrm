@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+purge)
+    # Written by `wp-rust-cache install`, not shipped as a conffile.
+    rm -rf /etc/wp-rust-cache
+    ;;
+esac
+
+exit 0

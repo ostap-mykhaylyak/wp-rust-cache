@@ -1,0 +1,22 @@
+wp_cache_* benchmark · real WordPress + WooCommerce values · 10s per run · 12 CPUs
+latency = one wp_cache_get/set call, hrtime around the call; the in-request cache is emptied at every simulated request
+
+backend    workers       ops/s   get p50   get p95   get p99   set p50   set p95   set p99    CPU/op
+rust             1      158187    3.6µs   14.3µs   49.2µs    3.6µs   49.2µs   73.7µs     6.39µs
+rust             2      301778    3.6µs   14.3µs   49.2µs    4.6µs   53.2µs   81.9µs     6.70µs
+rust             4      559666    3.8µs   15.4µs   53.2µs    4.6µs   53.2µs   98.3µs     7.19µs
+rust             8      781048    4.6µs   16.4µs   90.1µs    7.2µs   30.7µs  122.9µs    10.27µs
+rust            16      779217    6.7µs   28.7µs   98.3µs    9.2µs   36.9µs  147.5µs    13.85µs
+rust            32      728396    6.7µs   30.7µs  147.5µs    9.2µs   45.1µs     1.8ms    16.20µs
+redis            1        6363  147.5µs  229.4µs  327.7µs  147.5µs  229.4µs  327.7µs   156.43µs
+redis            2       11982  163.8µs  294.9µs  426.0µs  163.8µs  262.1µs  458.8µs   134.73µs
+redis            4       21920  180.2µs  294.9µs  426.0µs  196.6µs  294.9µs  426.0µs   116.91µs
+redis            8       23689  327.7µs  524.3µs  655.4µs  360.4µs  458.8µs  589.8µs   125.00µs
+redis           16       24513  655.4µs  917.5µs     1.2ms  720.9µs  917.5µs     1.3ms   136.73µs
+redis           32       23060     1.4ms     2.1ms     3.7ms     1.4ms     2.4ms     3.9ms   170.88µs
+memcached        1        4992  196.6µs  262.1µs  852.0µs  180.2µs  245.8µs  655.4µs   212.04µs
+memcached        2        8938  213.0µs  294.9µs  917.5µs  213.0µs  294.9µs  917.5µs   229.44µs
+memcached        4       16591  229.4µs  327.7µs  983.0µs  213.0µs  294.9µs  393.2µs   240.83µs
+memcached        8       27935  262.1µs  458.8µs     1.2ms  245.8µs  393.2µs  720.9µs   247.43µs
+memcached       16       44710  294.9µs     1.0ms     1.6ms  294.9µs  720.9µs     1.4ms   204.91µs
+memcached       32       53565  393.2µs     1.8ms     3.4ms  393.2µs     1.4ms     2.9ms   198.23µs

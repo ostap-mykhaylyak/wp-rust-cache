@@ -1,0 +1,9 @@
+engine benchmark · workload=get · 64 shards · 256.00 MB · Lru · 12 CPUs · 2s per run
+latency = time of one Cache::get/set call measured in the worker (includes ~20ns clock overhead)
+
+workers  requests/s        ops/s  get p50  get p95  get p99  set p50  set p95  set p99   CPU/req    hit%  contended
+      1       92343      1846860    288ns    640ns    896ns        -        -        -    10.8µs  100.0%      0.00‰
+      4      282425      5648500    416ns    768ns    2.3µs        -        -        -    13.8µs  100.0%     24.88‰
+      8      402715      8054300    512ns    1.4µs    3.1µs        -        -        -    17.9µs  100.0%     53.95‰
+     16      481067      9621340    576ns    2.3µs    3.8µs        -        -        -    21.9µs  100.0%     76.52‰
+     32      489093      9781860    576ns    2.3µs    4.6µs        -        -        -    22.5µs  100.0%     79.00‰

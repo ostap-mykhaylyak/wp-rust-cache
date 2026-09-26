@@ -1,0 +1,21 @@
+  ok    baseline: pages 200, CLI→FPM coherent, structures consistent
+-- kill -9 one worker at a time, 20 times, under load
+  ok    after 20 single kills: pages 200, CLI→FPM coherent, structures consistent
+-- kill -9 eight workers at once, 5 times, under load
+  ok    after 5 × 8 simultaneous kills: pages 200, CLI→FPM coherent, structures consistent
+-- kill -9 every worker and the master, then start PHP-FPM
+  ok    after killing all of PHP-FPM: pages 200, CLI→FPM coherent, structures consistent
+-- segment deleted while workers use it (reboot empties /dev/shm)
+  ok    after deleting the segment: pages 200, CLI→FPM coherent, structures consistent
+-- recreate under load
+  ok    after wp-rust-cache recreate: pages 200, CLI→FPM coherent, structures consistent
+-- configuration change (shards 64 → 32) and PHP-FPM reload
+  ok    new segment has 32 shards
+  ok    after configuration change: pages 200, CLI→FPM coherent, structures consistent
+
+segment counters: recoveries=0 shard_resets=0 attaches=19
+total 525572
+drwxrwxrwt 2 root     root            60 Sep 26 19:16 .
+drwxr-xr-x 5 root     root           340 Sep 26 19:10 ..
+-rw------- 1 www-data www-data 538185728 Sep 26 19:16 wp-rust-cache
+crash: all checks passed

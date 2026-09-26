@@ -1,0 +1,11 @@
+eviction benchmark · workload=wordpress · 150000 requests (first 20% warm-up) · 16 shards
+
+  memory   policy      hit%  misses/req  evictions   rejected      req/s
+16.00 MB      lru    77.56%       10.55    1266729          0      35594
+16.00 MB  tinylfu    79.95%        9.42     329473     801892      40003
+32.00 MB      lru    85.77%        6.69     803643          0      33520
+32.00 MB  tinylfu    87.13%        6.05     326307     400463      34820
+64.00 MB      lru    93.09%        3.25     390976          0      30325
+64.00 MB  tinylfu    93.11%        3.24     347751      42489      30054
+128.00 MB      lru    99.23%        0.36      45670          0      31995
+128.00 MB  tinylfu    99.38%        0.29       5506      29194      29586

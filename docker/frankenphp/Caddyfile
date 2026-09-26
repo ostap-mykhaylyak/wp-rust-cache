@@ -1,0 +1,23 @@
+{
+	auto_https off
+	frankenphp {
+		num_threads 32
+	}
+}
+
+# Classic mode: one PHP request per HTTP request, 32 threads.
+:8080 {
+	root * /app
+	php_server
+}
+
+# Worker mode: long-lived PHP scripts; RINIT does not run per request.
+:8081 {
+	root * /app
+	php_server {
+		worker {
+			file /app/worker.php
+			num 8
+		}
+	}
+}

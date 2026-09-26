@@ -1,0 +1,11 @@
+# Configuration used by the PHP test suites.
+[cache]
+memory = "32MB"
+shards = 8
+max_item_size = "1MB"
+
+[shared_memory]
+path = "/dev/shm/wp-rust-cache-test"
+permissions = "0600"
+# Tests run as root inside containers.
+owner = "root"

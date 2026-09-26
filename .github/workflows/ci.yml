@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      # Forking tests share one mapping between processes: one thread.
+      - run: cargo test --workspace -- --test-threads=1
+      # The ownership and root-policy tests only run as root.
+      - run: sudo -E env "PATH=$PATH" cargo test -p wprc-core -- --test-threads=1
+
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.2", "8.3", "8.4", "8.5"]
+        ts: [nts]
+        include:
+          - php: "8.4"
+            ts: ts
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pcntl
+          tools: none
+        env:
+          phpts: ${{ matrix.ts }}
+      # Extension tests (incl. 100 forked processes) and parity with the
+      # object cache of WordPress core, single site and multisite.
+      - run: sh tests/run-php-tests.sh
+      - run: WP_VERSION=7.1 sh tests/run-php-tests.sh
+
+  # Threads: FrankenPHP (PHP ZTS) runs many requests in one process.
+  frankenphp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -q -f docker/frankenphp/Dockerfile -t wprc-frankenphp .
+      - run: docker run --rm --shm-size=256m wprc-frankenphp bash /test.sh
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sh packaging/build-all.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-amd64
+          path: dist/*.deb
+
+  # The package on real distributions with systemd and their own PHP-FPM:
+  # apt install, `wp-rust-cache install`, reload, checks, uninstall, purge.
+  distro:
+    runs-on: ubuntu-latest
+    needs: package
+    strategy:
+      fail-fast: false
+      matrix:
+        base: ["ubuntu:26.04", "ubuntu:24.04", "debian:trixie"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-amd64
+          path: dist
+      - name: distro test
+        run: |
+          docker build -q -f docker/distro/Dockerfile --build-arg BASE=${{ matrix.base }} -t distro docker/distro
+          docker run -d --name distro --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
+            --shm-size=1g -v "$PWD/dist:/dist:ro" distro
+          docker exec distro bash /root/distro-test.sh "$(ls dist/*.deb | sed 's|^dist|/dist|')"

@@ -1,0 +1,9 @@
+eviction benchmark · workload=multisite · 150000 requests (first 20% warm-up) · 16 shards
+
+  memory   policy      hit%  misses/req  evictions   rejected      req/s
+32.00 MB      lru    74.28%       12.09    1451242          0      29878
+32.00 MB  tinylfu    76.35%       11.11     338706     996023      33609
+64.00 MB      lru    82.50%        8.22     988500          0      27807
+64.00 MB  tinylfu    83.84%        7.59     383402     526949      29090
+128.00 MB      lru    90.03%        4.69     559740          0      26815
+128.00 MB  tinylfu    90.22%        4.60     495129      60574      25801

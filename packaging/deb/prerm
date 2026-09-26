@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+# On removal the module files go away: disable the extension first so PHP
+# does not warn about a missing module. The drop-in left in wp-content falls
+# back to WordPress's per-request cache by itself.
+case "$1" in
+remove|deconfigure)
+    for ini in /etc/php/*/mods-available/wp_rust_cache.ini; do
+        [ -f "$ini" ] || continue
+        grep -q '/usr/lib/wp-rust-cache/' "$ini" || continue
+        version=$(echo "$ini" | cut -d/ -f4)
+        if command -v phpdismod >/dev/null 2>&1; then
+            phpdismod -v "$version" wp_rust_cache || true
+        fi
+        rm -f "$ini"
+    done
+    ;;
+esac
+
+exit 0

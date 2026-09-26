@@ -1,0 +1,26 @@
+-- drop-in active
+  ok    WP-CLI uses shared memory
+-- every URL, twice (cold, then from cache)
+  ok    cold: 554 URLs → 200
+  ok    warm: 554 URLs → 200
+  ok    PHP-FPM hits in shared memory: 139916
+-- cache coherence between PHP-FPM and WP-CLI
+  ok    option written by WP-CLI is read by PHP-FPM
+  ok    update invalidates the value PHP-FPM had cached
+-- WooCommerce
+  ok    cart keeps the product across requests (session)
+  ok    second add-to-cart gives quantity 2
+  ok    order #4016 reduced stock 16 → 13, seen by PHP-FPM
+-- Elementor
+  ok    Elementor page renders its widgets
+  ok    Elementor page renders again from cache
+-- WP-CLI commands
+  ok    wp rust-cache status
+  ok    wp rust-cache inspect alloptions
+  ok    wp rust-cache flush
+-- structures
+  ok    wp-rust-cache verify
+-- PHP log
+  ok    nothing logged by or about the object cache
+
+compat: all checks passed
