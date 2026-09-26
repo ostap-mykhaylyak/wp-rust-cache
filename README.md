@@ -33,7 +33,9 @@ PHP-FPM worker ─┘
   3.6 µs against 148 µs (Redis) and 197 µs (Memcached); end to end on
   WordPress 7.1 + WooCommerce + Elementor, +13 % requests/s against both no
   cache and Redis, and −13 % / −5 % CPU per request — Redis and Memcached,
-  on this server, were not faster than no object cache at all.
+  on this server, were not faster than no object cache at all. On PHP 8.5
+  the unloaded TTFB is 18–19 % lower than without a cache; the gain under
+  load is smaller (+5 % to +10 %) and within the spread of that series.
 
 **Primary target: Ubuntu 26.04 LTS with its own PHP 8.5 FPM.**
 

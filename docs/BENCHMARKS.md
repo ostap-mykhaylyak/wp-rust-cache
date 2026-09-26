@@ -82,6 +82,32 @@ An earlier series (before the group model of layout version 2, see
 ARCHITECTURE.md §6) gave the same ranking: rust 111.2 / 38.7 req/s against
 Redis 84.0 / 31.6 and none 96.2 / 32.6.
 
+### PHP 8.5 (the production target)
+
+Same site, same scripts, `wprc-bench:8.5` image (PHP 8.5.11); raw output in
+[`results-php85/`](results-php85/). The wordpress.org Memcached drop-in is
+missing: its PECL `memcache` extension does not build on PHP 8.5.
+
+| scenario | backend | req/s per round | mean | p50 | TTFB p50 | CPU/req |
+|---|---|---|---|---|---|---|
+| core | none | 93.9 · 89.8 · 92.3 | 92.0 | 334.2 ms | 74.3 ms | 124.0 ms |
+| core | **rust** | 98.6 · 99.7 · 106.5 | **101.6** | **301.5 ms** | **60.6 ms** | **111.8 ms** |
+| core | redis | 78.6 · 82.6 · 74.9 | 78.7 | 391.5 ms | 74.8 ms | 125.9 ms |
+| full | none | 32.2 · 31.7 · 34.9 | 32.9 | 940.2 ms | 184.9 ms | 345.4 ms |
+| full | **rust** | 31.8 · 33.8 · 38.5 | **34.7** | **888.3 ms** | **149.0 ms** | **326.8 ms** |
+| full | redis | 29.3 · 31.0 · 33.2 | 31.2 | 984.8 ms | 178.8 ms | 328.2 ms |
+
+**Reading.** Unloaded TTFB is 18–19 % lower than without a cache in both
+scenarios, and wp-rust-cache is ahead of Redis in every round. Under load the
+gain over no cache is smaller than on PHP 8.4: +10 % on plain WordPress, and
++5 % with WooCommerce and Elementor, which is within the spread of this
+series — in its first round wp-rust-cache served 31.8 req/s against 32.2
+without a cache. Every backend got faster from round 1 to round 3, so the
+machine was drifting during this run; a longer series would be needed to
+state the PHP 8.5 end-to-end gain more precisely. The `wp_cache_*` latencies
+on PHP 8.5 (`results-php85/ops.txt`) match PHP 8.4: 3.6 µs P50 against
+164 µs for Redis.
+
 ## 2. `wp_cache_*` inside WordPress
 
 `docker/bench/bench-ops.sh 10 1,2,4,8,16,32` — N `wp eval-file` processes

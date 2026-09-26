@@ -8,7 +8,10 @@ run compat bash /bench/compat.sh
 run crash bash /bench/crash.sh
 run http-core bash /bench/rounds.sh core 3 30
 run http-full bash /bench/rounds.sh full 3 30
-run ops bash /bench/bench-ops.sh 10 1,2,4,8,16,32 rust redis memcached
+backends="rust redis"
+[ "$(php -r 'echo extension_loaded("memcache") ? 1 : 0;')" = 1 ] && backends="$backends memcached"
+# shellcheck disable=SC2086
+run ops bash /bench/bench-ops.sh 10 1,2,4,8,16,32 $backends
 run engine-wordpress wprc-bench engine --workload wordpress --seconds 3
 run engine-get wprc-bench engine --workload get --workers 1,4,8,16,32 --seconds 2
 run eviction-woocommerce wprc-bench eviction --workload woocommerce --memory 16MB,32MB,64MB,128MB,256MB --requests 150000

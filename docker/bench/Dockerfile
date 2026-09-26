@@ -16,9 +16,13 @@ RUN apt-get update \
       nginx mariadb-server redis-server memcached wrk curl unzip less procps \
       libmemcached-dev zlib1g-dev libssl-dev libzip-dev libicu-dev \
       $PHPIZE_DEPS \
- && docker-php-ext-install mysqli pdo_mysql opcache pcntl zip intl bcmath \
- && pecl install redis memcached memcache \
- && docker-php-ext-enable redis memcached memcache \
+ && docker-php-ext-install mysqli pdo_mysql pcntl zip intl bcmath \
+ && { php -m | grep -qi '^Zend OPcache$' || docker-php-ext-install opcache; } \
+ && pecl install redis memcached \
+ && docker-php-ext-enable redis memcached \
+ # PECL memcache (used by the wordpress.org Memcached drop-in) does not
+ # build on PHP 8.5: without it that backend is simply left out.
+ && { pecl install memcache && docker-php-ext-enable memcache || echo "memcache: not available for this PHP"; } \
  && apt-get purge -y --auto-remove $PHPIZE_DEPS \
  && rm -rf /var/lib/apt/lists/* /tmp/pear
 

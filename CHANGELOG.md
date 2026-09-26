@@ -18,4 +18,5 @@ First release.
   recreate, install, uninstall.
 - Security: a segment is trusted only when owned by the process user, root,
   or the configured owner; world-accessible segments are refused.
-- Debian package with modules for PHP 8.2–8.5.
+- Debian package with modules for PHP 8.2–8.5, tested with systemd on
+  Ubuntu 26.04 (PHP 8.5, the primary target), Ubuntu 24.04 and Debian 13.

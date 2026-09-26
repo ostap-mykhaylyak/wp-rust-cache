@@ -1,0 +1,16 @@
+wp_cache_* benchmark · real WordPress + WooCommerce values · 10s per run · 12 CPUs
+latency = one wp_cache_get/set call, hrtime around the call; the in-request cache is emptied at every simulated request
+
+backend    workers       ops/s   get p50   get p95   get p99   set p50   set p95   set p99    CPU/op
+rust             1      160462    3.6µs    9.2µs   49.2µs    3.8µs   49.2µs   73.7µs     6.28µs
+rust             2      310938    3.6µs    9.2µs   49.2µs    4.1µs   53.2µs   81.9µs     6.51µs
+rust             4      565337    3.8µs   12.3µs   53.2µs    4.6µs   53.2µs   98.3µs     7.13µs
+rust             8      764696    5.1µs   18.4µs   90.1µs    7.7µs   30.7µs  131.1µs    10.43µs
+rust            16      696025    6.7µs   24.6µs  114.7µs    9.2µs   36.9µs  229.4µs    14.93µs
+rust            32      569381    6.7µs   32.8µs  213.0µs   10.2µs   73.7µs     1.3ms    21.02µs
+redis            1        6008  163.8µs  262.1µs  426.0µs  163.8µs  245.8µs  294.9µs   163.78µs
+redis            2       11588  163.8µs  294.9µs  426.0µs  163.8µs  262.1µs  360.4µs   141.91µs
+redis            4       21504  196.6µs  294.9µs  458.8µs  196.6µs  294.9µs  360.4µs   119.56µs
+redis            8       23144  360.4µs  524.3µs  720.9µs  360.4µs  524.3µs  720.9µs   127.22µs
+redis           16       24145  655.4µs  983.0µs     1.4ms  720.9µs  983.0µs     1.3ms   142.65µs
+redis           32       20074     1.6ms     2.9ms     4.7ms     1.6ms     3.4ms    12.6ms   216.09µs

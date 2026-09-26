@@ -1,5 +1,30 @@
 # Operating wp-rust-cache
 
+## Ubuntu 26.04 with PHP 8.5 (the primary target)
+
+Ubuntu 26.04 LTS ships PHP 8.5 (`php8.5-fpm`), which the package supports
+directly. The whole sequence below is what CI runs on `ubuntu:26.04` under
+systemd (`docker/distro/distro-test.sh`).
+
+```bash
+apt install php8.5-fpm php8.5-mysql php8.5-xml php8.5-mbstring php8.5-curl php8.5-intl
+apt install ./wp-rust-cache_0.1.0_amd64.deb
+wp-rust-cache install --wp /var/www/example.com --user www-data
+systemctl reload php8.5-fpm
+```
+
+* The extension is enabled through `phpenmod` for every SAPI of PHP 8.5
+  (`/etc/php/8.5/mods-available/wp_rust_cache.ini`, pointing at
+  `/usr/lib/wp-rust-cache/php-8.5/wp_rust_cache.so`).
+* `/dev/shm` is half the RAM by default. On a 4 GB server that is 2 GB, and
+  `install` picks a 1 GB cache; keep `memory` at or below half of `/dev/shm`.
+  To enlarge it permanently, in `/etc/fstab`:
+  `tmpfs /dev/shm tmpfs defaults,size=3G 0 0`.
+* Per-site pools: `/etc/php/8.5/fpm/pool.d/<site>.conf`, with
+  `php_admin_value[wp_rust_cache.segment]` (see "Several PHP users").
+* The Memcached drop-in from wordpress.org cannot run on PHP 8.5 (its PECL
+  `memcache` extension does not build there); Redis Object Cache can.
+
 ## Install
 
 ```bash

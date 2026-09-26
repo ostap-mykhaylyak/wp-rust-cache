@@ -1,0 +1,15 @@
+## round 1
+backend        req/s        p50        p95        p99   TTFB p50    CPU/req  errors cache memory
+none            93.9    324.6ms    464.1ms    551.7ms     73.7ms    121.7ms       0 -
+rust            98.6    310.7ms    450.4ms    521.1ms     60.6ms    114.2ms       0 2.7MB
+redis           78.6    392.6ms    535.0ms    602.9ms     73.2ms    123.9ms       0 4.5MB
+## round 2
+backend        req/s        p50        p95        p99   TTFB p50    CPU/req  errors cache memory
+redis           82.6    373.7ms    509.4ms    568.0ms     74.8ms    121.6ms       0 4.5MB
+rust            99.7    306.0ms    443.8ms    509.7ms     61.3ms    113.5ms       0 2.7MB
+none            89.8    343.2ms    485.4ms    563.5ms     74.4ms    126.5ms       0 -
+## round 3
+backend        req/s        p50        p95        p99   TTFB p50    CPU/req  errors cache memory
+redis           74.9    408.1ms    615.5ms    726.5ms     76.3ms    132.3ms       0 4.6MB
+none            92.3    334.8ms    464.6ms    541.3ms     74.8ms    123.7ms       0 -
+rust           106.5    287.7ms    399.3ms    462.8ms     60.0ms    107.6ms       0 2.7MB
