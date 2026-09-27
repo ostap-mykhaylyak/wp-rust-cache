@@ -18,6 +18,9 @@ WP="wp --allow-root --path=/var/www/wp"
 echo "== $(. /etc/os-release; echo "$PRETTY_NAME"), PHP $(php -r 'echo PHP_VERSION;')"
 
 systemctl start mariadb "$FPM" nginx
+# The database must answer before the site can be set up (we no longer wait
+# for the whole boot).
+for _ in $(seq 60); do mysqladmin ping >/dev/null 2>&1 && break; sleep 1; done
 mysql -e "CREATE DATABASE IF NOT EXISTS wp; CREATE USER IF NOT EXISTS 'wp'@'localhost' IDENTIFIED BY 'wp'; GRANT ALL ON wp.* TO 'wp'@'localhost';"
 mkdir -p /var/www/wp
 $WP core download --quiet
