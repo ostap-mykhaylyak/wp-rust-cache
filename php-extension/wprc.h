@@ -72,5 +72,8 @@ int wprc_flush_group(uint64_t gid);
 int wprc_flush_namespace(const char *ns, size_t ns_len);
 int wprc_flush_all(void);
 int wprc_read_stats(wprc_stats *out);
+/* Shard resets this process performed since the last call, as one log line
+ * (0 = none). */
+size_t wprc_recovery_notice(char *buf, size_t cap);
 
 #endif

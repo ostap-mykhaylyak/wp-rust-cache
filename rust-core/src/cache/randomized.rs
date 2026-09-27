@@ -257,8 +257,11 @@ fn survives_random_memory_corruption() {
             Some(TAG_STRING)
         );
     }
+    let s = c.stats();
+    assert!(s.recoveries > 0, "the corruption was never detected");
     assert!(
-        c.stats().recoveries > 0,
-        "the corruption was never detected"
+        s.recover_inconsistent > 0,
+        "corruption must be reported as such"
     );
+    assert_eq!(s.recover_owner_died, 0);
 }

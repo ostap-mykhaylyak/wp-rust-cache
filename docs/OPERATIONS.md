@@ -8,7 +8,7 @@ systemd (`docker/distro/distro-test.sh`).
 
 ```bash
 apt install php8.5-fpm php8.5-mysql php8.5-xml php8.5-mbstring php8.5-curl php8.5-intl
-apt install ./wp-rust-cache_0.1.1_amd64.deb
+apt install ./wp-rust-cache_0.1.2_amd64.deb
 wp-rust-cache install --wp /var/www/example.com --user www-data
 systemctl reload php8.5-fpm
 ```
@@ -28,7 +28,7 @@ systemctl reload php8.5-fpm
 ## Install
 
 ```bash
-apt install ./wp-rust-cache_0.1.1_amd64.deb
+apt install ./wp-rust-cache_0.1.2_amd64.deb
 wp-rust-cache install --wp /var/www/example.com --user www-data
 systemctl reload php8.5-fpm
 wp-rust-cache status
@@ -49,6 +49,64 @@ built-in cache.
 
 Several sites on the same PHP user share one segment and stay separate by
 namespace: run `install --wp` once per site.
+
+## Memory: read this before choosing `memory`
+
+The segment is **RAM the kernel cannot reclaim**, and with
+`preallocate = true` (the default) all of it is taken when the segment is
+created, whatever the cache actually holds. It counts against the PHP-FPM
+service, not against a file cache.
+
+What happened on the first production server shows why this matters: 2 GB of
+RAM, no swap, inside a container whose `/dev/shm` reported 3.9 GB. v0.1.0
+sized the cache from `/dev/shm` alone and picked 1 GB. PHP-FPM, MariaDB and
+the segment no longer fitted: the kernel OOM killer killed PHP workers at
+every traffic peak, and with systemd's `OOMPolicy=stop` each kill stopped
+and restarted the whole PHP-FPM service — 84 times in one day, each time
+emptying OPcache and cutting requests off. The cache itself held 87 MB.
+
+Since v0.1.2:
+
+* `install` picks a tenth of the RAM (container limits included), at most
+  half of the free space in `/dev/shm`, at most 1 GB;
+* `install` and `wp-rust-cache status` warn when `memory` is above 25 % of
+  the RAM.
+
+How to tell if it happens to you:
+
+```bash
+systemctl show php8.5-fpm -p NRestarts          # climbing = PHP-FPM keeps failing
+journalctl -u php8.5-fpm | grep -i oom          # "Failed with result 'oom-kill'"
+grep -E 'MemAvailable|Shmem:' /proc/meminfo
+```
+
+How much is enough: `wp-rust-cache stats` → `allocated_bytes` after a day of
+traffic, times 1.5 to 2. A WooCommerce store with ~6 000 products used about
+90 MB after a few hours and levels off well below 256 MB.
+
+To resize, change `memory` and **restart** PHP-FPM (a reload may keep old
+workers, and the old segment's RAM is only returned when no process maps it
+any more):
+
+```bash
+sed -i 's/^memory = .*/memory = "256MB"/' /etc/wp-rust-cache/config.toml
+systemctl restart php8.5-fpm
+grep Shmem: /proc/meminfo                        # should drop by the old size
+```
+
+If it does not drop, some other process still maps the old segment (a CLI
+cron job, for instance):
+
+```bash
+for p in $(grep -l 'wp-rust-cache (deleted)' /proc/[0-9]*/maps); do ps -o pid,user,etime,cmd --no-headers -p ${p//[^0-9]/}; done
+```
+
+Shard resets (`recoveries` in `stats`) now come with their cause:
+`recoveries_owner_died` — a process was killed while holding a shard lock
+(OOM kill, `kill -9`, a crash); `recoveries_interrupted`;
+`recoveries_inconsistent` — a consistency check failed, which should not
+happen and is worth reporting. The worker that performs a reset also writes a
+line to the PHP error log.
 
 ## Sizing
 

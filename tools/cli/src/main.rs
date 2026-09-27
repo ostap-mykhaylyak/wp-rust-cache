@@ -1,6 +1,7 @@
 //! `wp-rust-cache`: status, statistics, maintenance and installation.
 
 mod install;
+mod sizing;
 mod view;
 
 use std::path::PathBuf;
@@ -179,7 +180,15 @@ fn status(args: &Args) -> Result<(), String> {
     let cfg = args.config()?;
     match Cache::attach(&cfg, AttachMode::Existing) {
         Ok(c) => {
-            print_status(&c.stats());
+            let s = c.stats();
+            print_status(&s);
+            if let Some(w) = sizing::ram_bytes().and_then(|ram| sizing::warning(s.heap_bytes, ram))
+            {
+                println!("\nWarning: {w}");
+            }
+            if let Some(line) = last_recovery(&s) {
+                println!("\n{line}");
+            }
             Ok(())
         }
         Err(Error::NotFound(why)) => {
@@ -240,6 +249,10 @@ fn stats(args: &Args) -> Result<(), String> {
         ("lock_contended", s.contended),
         ("shard_resets", s.resets),
         ("recoveries", s.recoveries),
+        ("recoveries_owner_died", s.recover_owner_died),
+        ("recoveries_interrupted", s.recover_interrupted),
+        ("recoveries_inconsistent", s.recover_inconsistent),
+        ("last_recovery_at", s.last_recovery_at),
         ("attaches", s.attaches),
         ("created_at", s.created_at),
         ("latency_samples_get", s.samples(true)),
@@ -303,7 +316,10 @@ fn stats(args: &Args) -> Result<(), String> {
     println!();
     row("Policy", s.policy);
     for (k, v) in &counters {
-        println!("  {k:<22}{v}");
+        println!("  {k:<24}{v}");
+    }
+    if let Some(line) = last_recovery(&s) {
+        println!("\n  {line}");
     }
     println!();
     println!(
@@ -347,6 +363,50 @@ fn stats(args: &Args) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// "Last shard reset: 2026-09-27 11:50:14 UTC (37 min ago): a process died
+/// holding the shard lock (kill -9, OOM kill or crash)".
+fn last_recovery(s: &Stats) -> Option<String> {
+    if s.last_recovery_at == 0 {
+        return None;
+    }
+    let now = wprc_core::now_secs() as u64;
+    let ago = now.saturating_sub(s.last_recovery_at);
+    let ago = match ago {
+        0..=119 => format!("{ago} s ago"),
+        120..=7199 => format!("{} min ago", ago / 60),
+        _ => format!("{} h ago", ago / 3600),
+    };
+    let cause = s
+        .last_recovery_cause
+        .map(|c| c.describe())
+        .unwrap_or("unknown cause");
+    Some(format!(
+        "Last shard reset: {} UTC ({ago}): {cause}",
+        utc(s.last_recovery_at)
+    ))
+}
+
+/// Unix seconds → "YYYY-MM-DD HH:MM:SS" (UTC), without a date crate.
+fn utc(t: u64) -> String {
+    let (days, rem) = (t / 86_400, t % 86_400);
+    // Civil-from-days (Howard Hinnant's algorithm).
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!(
+        "{y:04}-{m:02}-{d:02} {:02}:{:02}:{:02}",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
 }
 
 /// Rows printed by `--groups` and `--keys` unless `--all` is given.
@@ -552,6 +612,14 @@ fn prometheus(s: &Stats, groups: Option<&[wprc_core::GroupUsage]>) -> String {
         "Shards reset after a crash or corruption.",
         s.recoveries as f64,
     );
+    let by_cause = format!(
+        "# HELP wp_rust_cache_recoveries_by_cause_total Shard resets by cause.\n\
+         # TYPE wp_rust_cache_recoveries_by_cause_total counter\n\
+         wp_rust_cache_recoveries_by_cause_total{{cause=\"owner_died\"}} {}\n\
+         wp_rust_cache_recoveries_by_cause_total{{cause=\"interrupted\"}} {}\n\
+         wp_rust_cache_recoveries_by_cause_total{{cause=\"inconsistent\"}} {}",
+        s.recover_owner_died, s.recover_interrupted, s.recover_inconsistent
+    );
     metric("entries", "gauge", "Entries stored.", s.entries as f64);
     metric(
         "allocated_bytes",
@@ -571,6 +639,8 @@ fn prometheus(s: &Stats, groups: Option<&[wprc_core::GroupUsage]>) -> String {
         "Processes that attached to the segment.",
         s.attaches as f64,
     );
+    o.push_str(&by_cause);
+    o.push('\n');
     for (op, get) in [("get", true), ("set", false)] {
         for (q, v) in [("0.5", 0.50), ("0.95", 0.95), ("0.99", 0.99)] {
             if let Some(ns) = s.latency(get, v) {
@@ -599,4 +669,14 @@ fn prometheus(s: &Stats, groups: Option<&[wprc_core::GroupUsage]>) -> String {
         }
     }
     o
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn utc_dates() {
+        assert_eq!(super::utc(0), "1970-01-01 00:00:00");
+        assert_eq!(super::utc(1_790_479_609), "2026-09-27 03:26:49");
+        assert_eq!(super::utc(951_782_400), "2000-02-29 00:00:00");
+    }
 }

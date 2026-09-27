@@ -624,3 +624,32 @@ pub unsafe extern "C" fn wprc_read_stats(out: *mut WprcStats) -> i32 {
         1
     })
 }
+
+/// Writes, at most once per event, a line describing the shard resets this
+/// process performed since the last call; returns its length (0 = nothing).
+///
+/// # Safety
+/// `buf` must be writable for `cap` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn wprc_recovery_notice(buf: *mut c_char, cap: usize) -> usize {
+    guard(0, || {
+        let Some((n, cause)) = wprc_core::take_recovery_notice() else {
+            return 0;
+        };
+        let msg = format!(
+            "wp-rust-cache: reset {n} cache shard(s) because {}; \
+             the cache keeps working, the reset entries are reloaded on demand",
+            cause.describe()
+        );
+        if buf.is_null() || cap == 0 {
+            return 0;
+        }
+        let n = msg.len().min(cap - 1);
+        // SAFETY: the caller guarantees `cap` writable bytes.
+        unsafe {
+            std::ptr::copy_nonoverlapping(msg.as_ptr(), buf as *mut u8, n);
+            *buf.add(n) = 0;
+        }
+        n
+    })
+}

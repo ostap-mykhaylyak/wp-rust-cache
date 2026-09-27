@@ -267,6 +267,14 @@ static void wprc_start(void)
 	const char *cfg = INI_STR("wp_rust_cache.config");
 	const char *seg = INI_STR("wp_rust_cache.segment");
 	wprc_request_start(cfg, cfg ? strlen(cfg) : 0, seg, seg ? strlen(seg) : 0);
+	{
+		/* A reset this worker performed (e.g. after another worker was
+		 * OOM-killed holding a lock) is worth a line in the PHP log. */
+		char note[512];
+		if (wprc_recovery_notice(note, sizeof(note)) > 0) {
+			php_log_err(note);
+		}
+	}
 }
 
 PHP_FUNCTION(wp_rust_cache_available)

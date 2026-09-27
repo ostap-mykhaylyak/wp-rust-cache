@@ -48,6 +48,18 @@ pub struct SegmentHeader {
     pub recoveries: AtomicU64,
     /// Names the diagnostic directory had no room for (no effect on caching).
     pub dir_overflow: AtomicU64,
+    // Appended in v0.1.2, in space that older segments already hold as zeros:
+    // the layout stays compatible. Why shards were reset:
+    /// the lock owner died (kill -9, OOM kill, crash);
+    pub recover_owner_died: AtomicU64,
+    /// an operation was found half-done (a panic, or an owner death the
+    /// mutex did not report);
+    pub recover_interrupted: AtomicU64,
+    /// a consistency check failed (corruption, or a bug).
+    pub recover_inconsistent: AtomicU64,
+    /// Unix seconds of the last reset, and its cause (1, 2, 3 as above).
+    pub last_recovery_at: AtomicU64,
+    pub last_recovery_cause: AtomicU32,
 }
 
 const _: () = assert!(std::mem::size_of::<SegmentHeader>() <= HEADER_SIZE);

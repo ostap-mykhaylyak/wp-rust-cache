@@ -12,6 +12,11 @@ echo "== $(php -r 'echo PHP_VERSION, PHP_ZTS ? " ZTS" : " NTS";') =="
 echo "-- extension"
 $PHP "$ROOT/tests/php/extension_test.php"
 
+echo "-- worker killed holding a lock"
+cargo build -q --release -p wp-rust-cache --manifest-path "$ROOT/Cargo.toml" 2>/dev/null
+WPRC_CLI="${CARGO_TARGET_DIR:-$ROOT/target}/release/wp-rust-cache --config $ROOT/tests/php/test.toml" \
+	sh "$ROOT/tests/php/recovery_test.sh" "$PHP"
+
 # Core's object cache, the reference for the parity test.
 CORE="${CORE_DIR:-/tmp/wp-core-$WP_VERSION}"
 if [ ! -f "$CORE/class-wp-object-cache.php" ]; then

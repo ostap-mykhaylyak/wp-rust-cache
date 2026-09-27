@@ -149,17 +149,16 @@ pub fn run(args: &Args) -> Result<(), String> {
     let new_config = if cfg_path.exists() {
         None
     } else {
-        // Size the cache to what /dev/shm can hold: half of its free space
-        // (a configuration change briefly needs room for two segments),
-        // at most 1 GB.
+        // A tenth of the RAM, capped by /dev/shm and 1 GB: see sizing.rs.
         let free = shm_available(&Config::default().path());
-        let memory = (free / 2).min(1 << 30) & !((64 << 20) - 1);
-        if memory < 64 << 20 {
-            return Err(format!(
-                "/dev/shm has {} free; at least 128 MB is needed",
+        let ram = crate::sizing::ram_bytes().unwrap_or(free);
+        let memory = crate::sizing::recommended(ram, free).ok_or_else(|| {
+            format!(
+                "too little memory for a useful cache ({} of RAM, {} free in /dev/shm)",
+                wprc_core::config::format_size(ram),
                 wprc_core::config::format_size(free)
-            ));
-        }
+            )
+        })?;
         Some(format!(
             "[cache]\nenabled = true\nmemory = \"{}MB\"\nshards = 64\neviction = \"tinylfu\"\n\n\
              [shared_memory]\npath = \"/dev/shm/wp-rust-cache\"\npermissions = \"0600\"\nowner = \"{user}\"\n",
@@ -186,6 +185,12 @@ pub fn run(args: &Args) -> Result<(), String> {
                 .unwrap_or_default(),
             wprc_core::config::format_size(free)
         ));
+    }
+    // An existing configuration is kept, but a risky size is pointed out.
+    if let Some(w) =
+        crate::sizing::ram_bytes().and_then(|ram| crate::sizing::warning(cfg.memory, ram))
+    {
+        warn(w);
     }
 
     // 3. extension

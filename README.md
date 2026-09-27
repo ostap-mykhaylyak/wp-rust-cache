@@ -48,7 +48,7 @@ built by the release workflow but have not been run.
 ## Install
 
 ```bash
-apt install ./wp-rust-cache_0.1.1_amd64.deb     # nothing is enabled yet
+apt install ./wp-rust-cache_0.1.2_amd64.deb     # nothing is enabled yet
 wp-rust-cache install --wp /var/www/html --user www-data
 systemctl reload php8.5-fpm
 wp-rust-cache status

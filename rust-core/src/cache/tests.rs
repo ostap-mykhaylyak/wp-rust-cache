@@ -300,6 +300,10 @@ fn dirty_shard_is_reset() {
     assert_eq!(c.stats().recoveries, 1);
     set(&c, g, "k", b"v");
     assert!(get(&c, g, "k").is_some());
+    let s = c.stats();
+    assert_eq!((s.recover_interrupted, s.recover_owner_died), (1, 0));
+    assert_eq!(s.last_recovery_cause, Some(Recovery::Interrupted));
+    assert!(s.last_recovery_at > 0);
 }
 
 // ---- multi-process -----------------------------------------------------------
@@ -384,6 +388,16 @@ fn owner_killed_while_holding_lock() {
     // The next locker gets EOWNERDEAD, resets the shard and carries on.
     assert_eq!(get(&c, g, "k"), None);
     assert_eq!(c.stats().recoveries, 1);
+    assert_eq!(c.stats().recover_owner_died, 1);
+    assert_eq!(c.stats().last_recovery_cause, Some(Recovery::OwnerDied));
+    assert_eq!(
+        take_recovery_notice().map(|(_, cause)| cause),
+        Some(Recovery::OwnerDied)
+    );
+    assert!(
+        take_recovery_notice().is_none(),
+        "a notice is reported once"
+    );
     set(&c, g, "k", b"again");
     assert_eq!(get(&c, g, "k").unwrap().1, b"again");
     assert_eq!(c.verify(false).unwrap(), vec![]);

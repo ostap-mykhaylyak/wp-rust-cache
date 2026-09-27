@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.1.2 — 2026-09-27
+
+From the first production install: on a 2 GB server without swap, the
+1 GB segment picked by v0.1.0 got PHP-FPM OOM-killed 84 times in a day.
+
+- `install` sizes the cache from the RAM (container limits included): a
+  tenth of it, at most half of the free `/dev/shm`, at most 1 GB. It used to
+  look at `/dev/shm` alone, which in containers can exceed the RAM.
+- `install` and `status` warn when `memory` is above 25 % of the RAM.
+- Shard resets are counted by cause: the lock owner died (OOM kill,
+  `kill -9`, crash), an operation was left half-done, a consistency check
+  failed. `stats` shows when the last one happened and why, Prometheus gets
+  `wp_rust_cache_recoveries_by_cause_total`, and the worker that performs a
+  reset writes a line to the PHP error log.
+- docs/OPERATIONS.md: a "Memory" section (non-reclaimable RAM, OOM kills,
+  how to resize and make sure the old segment is released).
+- Segment layout unchanged (new counters live in space older segments hold
+  as zeros): upgrading keeps the cache.
+
 ## v0.1.1 — 2026-09-27
 
 From the first production install (WooCommerce on Ubuntu 26.04, PHP 8.5).

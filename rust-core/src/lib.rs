@@ -21,7 +21,10 @@ mod shard;
 pub mod stats;
 pub mod value;
 
-pub use cache::{AttachMode, Cache, EntryInfo, Error, IncrOutcome, KeyUsage, SetMode, SetOutcome};
+pub use cache::{
+    take_recovery_notice, AttachMode, Cache, EntryInfo, Error, IncrOutcome, KeyUsage, Recovery,
+    SetMode, SetOutcome,
+};
 pub use config::Config;
 pub use groups::GroupHandle;
 pub use stats::{GroupUsage, Stats};

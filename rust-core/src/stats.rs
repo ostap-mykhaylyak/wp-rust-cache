@@ -14,6 +14,12 @@ pub struct Stats {
     pub created_at: u64,
     pub attaches: u64,
     pub recoveries: u64,
+    pub recover_owner_died: u64,
+    pub recover_interrupted: u64,
+    pub recover_inconsistent: u64,
+    /// Unix seconds of the last shard reset (0 = never) and its cause.
+    pub last_recovery_at: u64,
+    pub last_recovery_cause: Option<crate::cache::Recovery>,
     pub groups_used: u32,
     pub namespaces: u32,
     /// Size of the diagnostic name directory, and names it had no room for.

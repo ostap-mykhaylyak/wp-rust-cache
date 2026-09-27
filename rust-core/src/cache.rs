@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
+use std::sync::atomic::{AtomicU32, AtomicU64};
 use std::time::Instant;
 use xxhash_rust::xxh3::xxh3_64;
 
@@ -121,6 +121,53 @@ unsafe impl Sync for Cache {}
 
 thread_local! {
     static SAMPLE: Cell<u32> = const { Cell::new(0) };
+}
+
+/// Why a shard was reset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Recovery {
+    /// The lock owner died holding it (kill -9, OOM kill, crash).
+    OwnerDied = 1,
+    /// An operation was found half-done.
+    Interrupted = 2,
+    /// A consistency check failed.
+    Inconsistent = 3,
+}
+
+impl Recovery {
+    pub fn from_u32(v: u32) -> Option<Recovery> {
+        match v {
+            1 => Some(Recovery::OwnerDied),
+            2 => Some(Recovery::Interrupted),
+            3 => Some(Recovery::Inconsistent),
+            _ => None,
+        }
+    }
+
+    pub fn describe(self) -> &'static str {
+        match self {
+            Recovery::OwnerDied => {
+                "a process died holding the shard lock (kill -9, OOM kill or crash)"
+            }
+            Recovery::Interrupted => "an operation was left half-done",
+            Recovery::Inconsistent => "a consistency check failed",
+        }
+    }
+}
+
+/// Resets performed by this process, not yet reported (see
+/// `take_recovery_notice`): the PHP extension logs them.
+static PROCESS_RECOVERIES: AtomicU64 = AtomicU64::new(0);
+static PROCESS_LAST_CAUSE: AtomicU32 = AtomicU32::new(0);
+
+/// Resets this process performed since the last call, with the last cause.
+pub fn take_recovery_notice() -> Option<(u64, Recovery)> {
+    let n = PROCESS_RECOVERIES.swap(0, Relaxed);
+    if n == 0 {
+        return None;
+    }
+    Recovery::from_u32(PROCESS_LAST_CAUSE.load(Relaxed)).map(|c| (n, c))
 }
 
 /// One operation in 64 is timed, so the fast path does not pay for a clock
@@ -647,9 +694,12 @@ impl Cache {
                 plan: self.plan,
                 tinylfu: self.tinylfu,
             };
-            if matches!(locked, Locked::OwnerDied) || ctx.st.dirty != 0 {
-                // The previous holder died mid-operation.
-                self.recover(&mut ctx);
+            if matches!(locked, Locked::OwnerDied) {
+                // The previous holder died holding the lock.
+                self.recover(&mut ctx, Recovery::OwnerDied);
+            } else if ctx.st.dirty != 0 {
+                // An operation was left half-done.
+                self.recover(&mut ctx, Recovery::Interrupted);
             }
             ctx.st.dirty = 1;
             match f(&mut ctx) {
@@ -658,18 +708,29 @@ impl Cache {
                     Ok(v)
                 }
                 Err(Corrupt) => {
-                    self.recover(&mut ctx);
+                    self.recover(&mut ctx, Recovery::Inconsistent);
                     Err(Error::Corrupted)
                 }
             }
         }
     }
 
-    fn recover(&self, ctx: &mut Ctx<'_>) {
+    fn recover(&self, ctx: &mut Ctx<'_>, cause: Recovery) {
         ctx.reset();
         let r = &ctx.stats.resets;
         r.store(r.load(Relaxed) + 1, Relaxed);
-        self.header().recoveries.fetch_add(1, Relaxed);
+        let h = self.header();
+        h.recoveries.fetch_add(1, Relaxed);
+        match cause {
+            Recovery::OwnerDied => &h.recover_owner_died,
+            Recovery::Interrupted => &h.recover_interrupted,
+            Recovery::Inconsistent => &h.recover_inconsistent,
+        }
+        .fetch_add(1, Relaxed);
+        h.last_recovery_at.store(crate::now_secs() as u64, Relaxed);
+        h.last_recovery_cause.store(cause as u32, Relaxed);
+        PROCESS_RECOVERIES.fetch_add(1, Relaxed);
+        PROCESS_LAST_CAUSE.store(cause as u32, Relaxed);
     }
 
     #[inline]
@@ -817,6 +878,11 @@ impl Cache {
             created_at: h.created_at,
             attaches: h.attaches.load(Relaxed),
             recoveries: h.recoveries.load(Relaxed),
+            recover_owner_died: h.recover_owner_died.load(Relaxed),
+            recover_interrupted: h.recover_interrupted.load(Relaxed),
+            recover_inconsistent: h.recover_inconsistent.load(Relaxed),
+            last_recovery_at: h.last_recovery_at.load(Relaxed),
+            last_recovery_cause: Recovery::from_u32(h.last_recovery_cause.load(Relaxed)),
             group_slots: h.dir_slots,
             groups_overflow: h.dir_overflow.load(Relaxed),
             lat_get: vec![0; HIST_BUCKETS],
@@ -1002,7 +1068,7 @@ impl Cache {
             let r = self.with_shard(i, |c| {
                 let r = c.verify();
                 if r.is_err() && repair {
-                    c.reset();
+                    self.recover(c, Recovery::Inconsistent);
                 }
                 Ok(r)
             })?;

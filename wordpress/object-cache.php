@@ -2,7 +2,7 @@
 /**
  * Plugin Name: wp-rust-cache
  * Description: Persistent object cache in shared memory, served by the wp_rust_cache PHP extension. No Redis, no Memcached, no network.
- * Version: 0.1.1
+ * Version: 0.1.2
  * License: MIT
  *
  * Install as wp-content/object-cache.php. Without the extension (or when the
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WP_RUST_CACHE_DROPIN_VERSION', '0.1.1' );
+define( 'WP_RUST_CACHE_DROPIN_VERSION', '0.1.2' );
 
 function wp_cache_init() {
 	// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
