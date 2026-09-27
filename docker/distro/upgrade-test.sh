@@ -9,7 +9,9 @@ NEW="$2"
 fail=0
 ok() { echo "  ok    $*"; }
 ko() { echo "  FAIL  $*"; fail=$((fail + 1)); }
-until systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded'; do sleep 1; done
+# systemd may stay "starting" if some unit waits at boot (seen on CI runners):
+# the script starts the services it needs itself, so wait at most 90 s.
+timeout 90 systemctl is-system-running --wait >/dev/null 2>&1 || true
 V=$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')
 FPM="php$V-fpm"
 WP="wp --allow-root --path=/var/www/wp"

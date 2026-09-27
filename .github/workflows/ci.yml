@@ -10,6 +10,7 @@ permissions:
 jobs:
   rust:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -24,6 +25,7 @@ jobs:
 
   php:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -50,6 +52,7 @@ jobs:
   # Threads: FrankenPHP (PHP ZTS) runs many requests in one process.
   frankenphp:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - run: docker build -q -f docker/frankenphp/Dockerfile -t wprc-frankenphp .
@@ -57,6 +60,7 @@ jobs:
 
   package:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - run: sh packaging/build-all.sh
@@ -69,6 +73,7 @@ jobs:
   # the cache must survive and the new module must be the one loaded.
   upgrade:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: package
     steps:
       - uses: actions/checkout@v7
@@ -93,6 +98,7 @@ jobs:
   # apt install, `wp-rust-cache install`, reload, checks, uninstall, purge.
   distro:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: package
     strategy:
       fail-fast: false
