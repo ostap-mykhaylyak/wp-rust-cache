@@ -65,6 +65,30 @@ jobs:
           name: deb-amd64
           path: dist/*.deb
 
+  # Upgrade from the latest published release on the production target:
+  # the cache must survive and the new module must be the one loaded.
+  upgrade:
+    runs-on: ubuntu-latest
+    needs: package
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-amd64
+          path: dist
+      - name: upgrade from the latest release
+        run: |
+          new=$(ls dist/*.deb)
+          url=$(curl -fsSL "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | grep -o 'https://[^"]*_amd64\.deb' | head -1 || true)
+          if [ -z "$url" ]; then echo "no release to upgrade from"; exit 0; fi
+          curl -fsSL -o dist/previous.deb "$url"
+          docker build -q -f docker/distro/Dockerfile --build-arg BASE=ubuntu:26.04 -t distro docker/distro
+          docker run -d --name distro --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
+            --shm-size=1g -v "$PWD/dist:/dist:ro" -v "$PWD/docker/distro:/t:ro" distro
+          docker exec distro bash /t/upgrade-test.sh /dist/previous.deb "/$new"
+
   # The package on real distributions with systemd and their own PHP-FPM:
   # apt install, `wp-rust-cache install`, reload, checks, uninstall, purge.
   distro:

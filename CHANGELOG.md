@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.1.1 — 2026-09-27
+
+From the first production install (WooCommerce on Ubuntu 26.04, PHP 8.5).
+
+- `stats --groups` folds numbered groups into one row per family
+  (`product_4428`, `product_4429`, … → `product_*` with the number of groups;
+  names the directory truncated fold too), and shows the 30 largest rows
+  unless `--all` is given.
+- `stats --keys GROUP [--namespace NS] [--all]`: the largest keys of a group,
+  read from the segment, with type, value size, memory, TTL and blog. Finds
+  the group by name, so the (often long) namespace is not needed.
+- `stats --prometheus` folds numbered groups the same way: one label per
+  WooCommerce product would have created a series per product.
+- No change to the extension, the drop-in behaviour or the segment layout:
+  upgrading keeps the cache.
+
 ## v0.1.0 — 2026-09-27
 
 First release.

@@ -652,3 +652,79 @@ fn unlimited_groups_like_woocommerce_products() {
         .count();
     assert!(alive >= 998, "{alive}");
 }
+
+#[test]
+fn group_keys_lists_one_group_largest_first() {
+    let (c, ns, g) = setup(&small());
+    let other = c.group(ns, b"other");
+    c.set(&g, 0, b"small", TAG_STRING, b"x", 0, SetMode::Set)
+        .unwrap();
+    c.set(&g, 0, b"big", TAG_STRING, &[7u8; 5000], 60, SetMode::Set)
+        .unwrap();
+    c.set(
+        &g,
+        3,
+        b"blog3",
+        TAG_LONG,
+        &1i64.to_ne_bytes(),
+        0,
+        SetMode::Set,
+    )
+    .unwrap();
+    c.set(&other, 0, b"elsewhere", TAG_STRING, b"y", 0, SetMode::Set)
+        .unwrap();
+    let keys = c.group_keys(ns, b"options").unwrap();
+    let names: Vec<&[u8]> = keys.iter().map(|k| k.key.as_slice()).collect();
+    assert_eq!(names.len(), 3);
+    assert_eq!(names[0], b"big");
+    assert!(keys[0].value_len == 5000 && keys[0].expires > 0 && keys[0].live);
+    let b3 = keys.iter().find(|k| k.key == b"blog3").unwrap();
+    assert_eq!((b3.blog, b3.tag), (3, TAG_LONG));
+    c.flush_group(&g).unwrap();
+    assert!(c
+        .group_keys(ns, b"options")
+        .unwrap()
+        .iter()
+        .all(|k| !k.live));
+}
+
+#[test]
+fn find_group_keys_by_name_across_namespaces() {
+    let c = Cache::anonymous(&small()).unwrap();
+    let long_salt = b"a-salt-much-longer-than-thirty-two-bytes-0123456789" as &[u8];
+    let a = c.group(long_salt, b"options");
+    let b = c.group(b"site-b", b"options");
+    let other = c.group(b"site-b", b"posts");
+    c.set(
+        &a,
+        0,
+        b"alloptions",
+        TAG_SERIALIZED,
+        &[1u8; 3000],
+        0,
+        SetMode::Set,
+    )
+    .unwrap();
+    c.set(
+        &b,
+        0,
+        b"notoptions",
+        TAG_SERIALIZED,
+        b"a:0:{}",
+        0,
+        SetMode::Set,
+    )
+    .unwrap();
+    c.set(&other, 0, b"1", TAG_STRING, b"post", 0, SetMode::Set)
+        .unwrap();
+    let found = c.find_group_keys(b"options").unwrap();
+    assert_eq!(found.len(), 2);
+    assert_eq!(found[0].1.key, b"alloptions");
+    assert!(
+        found[0].0.ends_with('…'),
+        "long namespace shown truncated: {}",
+        found[0].0
+    );
+    assert_eq!(found[1].0, "site-b");
+    assert!(c.find_group_keys(b"nothing").unwrap().is_empty());
+}

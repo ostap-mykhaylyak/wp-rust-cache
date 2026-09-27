@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "wp-rust-cache"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "wprc-core",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "wprc-bench"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "wprc-core",
@@ -178,7 +178,7 @@ dependencies = [
 
 [[package]]
 name = "wprc-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libc",
  "serde",
@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "wprc-ffi"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "wprc-core",
 ]

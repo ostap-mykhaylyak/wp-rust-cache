@@ -73,6 +73,23 @@ pub enum AttachMode {
     Existing,
 }
 
+/// One key of a group, from `Cache::group_keys`.
+#[derive(Debug, Clone)]
+pub struct KeyUsage {
+    /// The key as WordPress passed it.
+    pub key: Vec<u8>,
+    /// 0 for single sites and global groups.
+    pub blog: u32,
+    pub tag: u8,
+    pub value_len: u32,
+    /// Bytes of the whole entry block.
+    pub alloc: u32,
+    /// Unix seconds, 0 = never.
+    pub expires: u32,
+    /// False when a flush made it unreachable (awaiting reclamation).
+    pub live: bool,
+}
+
 /// Result of `Cache::inspect`.
 #[derive(Debug, Clone)]
 pub struct EntryInfo {
@@ -894,6 +911,87 @@ impl Cache {
         let mut v: Vec<GroupUsage> = map.into_values().collect();
         v.sort_by_key(|u| std::cmp::Reverse(u.bytes));
         Ok(v)
+    }
+
+    /// The keys stored for `group` of namespace `ns`, largest first: what
+    /// `wp-rust-cache stats --keys` prints. Walks every shard, one locked at
+    /// a time; nothing on the fast path.
+    pub fn group_keys(&self, ns: &[u8], group: &[u8]) -> Result<Vec<KeyUsage>, Error> {
+        let id = groups::group_id(ns, group).to_le_bytes();
+        let mut out = Vec::new();
+        for i in 0..self.shard_count {
+            self.with_shard(i, |c| {
+                c.walk(|w| {
+                    if w.key.len() >= KEY_PREFIX && w.key[20..36] == id {
+                        out.push(KeyUsage {
+                            key: w.key[KEY_PREFIX..].to_vec(),
+                            blog: u32::from_le_bytes(w.key[16..20].try_into().unwrap()),
+                            tag: w.tag,
+                            value_len: w.value_len,
+                            alloc: w.alloc,
+                            expires: w.expires,
+                            live: self.is_live(w.key),
+                        });
+                    }
+                })
+            })?;
+        }
+        out.sort_by_key(|k| std::cmp::Reverse(k.alloc));
+        Ok(out)
+    }
+
+    /// Like `group_keys`, for every namespace that has a group called
+    /// `group`, found through the name directory (so the namespace name,
+    /// often a long salt, is not needed). Returns (namespace, key) pairs,
+    /// largest first. Groups the directory had no room for are not found.
+    pub fn find_group_keys(&self, group: &[u8]) -> Result<Vec<(String, KeyUsage)>, Error> {
+        let entries = groups::entries(self.dir());
+        let ns_names: HashMap<u64, String> = entries
+            .iter()
+            .filter(|e| e.parent_lo == 0)
+            .map(|e| (e.lo, e.name.clone()))
+            .collect();
+        let wanted = String::from_utf8_lossy(group);
+        let targets: HashMap<u64, String> = entries
+            .iter()
+            .filter(|e| e.parent_lo != 0 && e.name == wanted)
+            .map(|e| {
+                (
+                    e.lo,
+                    ns_names.get(&e.parent_lo).cloned().unwrap_or_default(),
+                )
+            })
+            .collect();
+        let mut out = Vec::new();
+        if targets.is_empty() {
+            return Ok(out);
+        }
+        for i in 0..self.shard_count {
+            self.with_shard(i, |c| {
+                c.walk(|w| {
+                    if w.key.len() < KEY_PREFIX {
+                        return;
+                    }
+                    let id = u128::from_le_bytes(w.key[20..36].try_into().unwrap());
+                    if let Some(ns) = targets.get(&groups::lo_of(id)) {
+                        out.push((
+                            ns.clone(),
+                            KeyUsage {
+                                key: w.key[KEY_PREFIX..].to_vec(),
+                                blog: u32::from_le_bytes(w.key[16..20].try_into().unwrap()),
+                                tag: w.tag,
+                                value_len: w.value_len,
+                                alloc: w.alloc,
+                                expires: w.expires,
+                                live: self.is_live(w.key),
+                            },
+                        ));
+                    }
+                })
+            })?;
+        }
+        out.sort_by_key(|(_, k)| std::cmp::Reverse(k.alloc));
+        Ok(out)
     }
 
     /// Structural check of every shard. Returns `(shard, problem)` pairs; with

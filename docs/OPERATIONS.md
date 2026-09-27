@@ -8,7 +8,7 @@ systemd (`docker/distro/distro-test.sh`).
 
 ```bash
 apt install php8.5-fpm php8.5-mysql php8.5-xml php8.5-mbstring php8.5-curl php8.5-intl
-apt install ./wp-rust-cache_0.1.0_amd64.deb
+apt install ./wp-rust-cache_0.1.1_amd64.deb
 wp-rust-cache install --wp /var/www/example.com --user www-data
 systemctl reload php8.5-fpm
 ```
@@ -28,7 +28,7 @@ systemctl reload php8.5-fpm
 ## Install
 
 ```bash
-apt install ./wp-rust-cache_0.1.0_amd64.deb
+apt install ./wp-rust-cache_0.1.1_amd64.deb
 wp-rust-cache install --wp /var/www/example.com --user www-data
 systemctl reload php8.5-fpm
 wp-rust-cache status
@@ -97,6 +97,11 @@ wp rust-cache flush --all    # every site in the segment
 ## Monitoring
 
 * `wp-rust-cache status` / `stats [--groups] [--json]`.
+* `wp-rust-cache stats --keys options` lists the largest keys of a group. A
+  large non-autoloaded option there (hundreds of KB) is read and unserialized
+  by every request that uses it, with any object cache: worth a look. On the
+  first production site this found a 1.8 MB `wp_mail_smtp_debug` (an event
+  list WP Mail SMTP never trimmed) read on every admin page.
 * Prometheus, through node_exporter's textfile collector:
   ```
   * * * * * root wp-rust-cache stats --prometheus > /var/lib/node_exporter/textfile/wp_rust_cache.prom.tmp && mv /var/lib/node_exporter/textfile/wp_rust_cache.prom.tmp /var/lib/node_exporter/textfile/wp_rust_cache.prom

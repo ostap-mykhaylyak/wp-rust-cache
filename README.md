@@ -48,7 +48,7 @@ built by the release workflow but have not been run.
 ## Install
 
 ```bash
-apt install ./wp-rust-cache_0.1.0_amd64.deb     # nothing is enabled yet
+apt install ./wp-rust-cache_0.1.1_amd64.deb     # nothing is enabled yet
 wp-rust-cache install --wp /var/www/html --user www-data
 systemctl reload php8.5-fpm
 wp-rust-cache status
@@ -143,7 +143,10 @@ The P50/P95/P99 here are engine latencies measured inside the extension
 (copying the value out of shared memory included; PHP decoding excluded).
 
 * `wp-rust-cache stats [--groups] [--json | --prometheus]` — every counter; `--groups` walks
-  the segment for per-group entries and memory (no cost on the fast path).
+  the segment for per-group entries and memory (no cost on the fast path), with
+  numbered groups such as WooCommerce's `product_123` folded into `product_*`.
+* `wp-rust-cache stats --keys options` — the largest keys of a group: which
+  options, transients or queries take the memory.
 * `wp-rust-cache flush [--namespace NS]`, `verify [--repair]`, `recreate`.
 * WP-CLI: `wp rust-cache status | stats | flush [--all] | inspect <key> --group=<g>`.
 

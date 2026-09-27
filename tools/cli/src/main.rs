@@ -1,6 +1,7 @@
 //! `wp-rust-cache`: status, statistics, maintenance and installation.
 
 mod install;
+mod view;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -12,9 +13,13 @@ wp-rust-cache — shared-memory object cache for WordPress
 
 Usage:
   wp-rust-cache status                 is the segment there, how full, how fast
-  wp-rust-cache stats [--groups] [--json | --prometheus]
-                                       every counter; --groups adds per-group usage;
+  wp-rust-cache stats [--groups] [--all] [--json | --prometheus]
+                                       every counter; --groups adds per-group usage
+                                       (numbered groups such as product_123 folded into
+                                       product_*, top 30 unless --all);
                                        --prometheus prints node_exporter textfile format
+  wp-rust-cache stats --keys GROUP [--namespace NS] [--all]
+                                       the largest keys of a group, read from the segment
   wp-rust-cache flush [--namespace NS] empty the segment (or one WordPress install)
   wp-rust-cache verify [--repair]      check every shard's structures
   wp-rust-cache recreate               retire the segment; workers start a new one
@@ -41,13 +46,14 @@ impl Args {
         let mut cmd = String::new();
         let mut flags = Vec::new();
         let mut values = Vec::new();
-        const WITH_VALUE: [&str; 6] = [
+        const WITH_VALUE: [&str; 7] = [
             "--config",
             "--segment",
             "--namespace",
             "--wp",
             "--user",
             "--extension",
+            "--keys",
         ];
         while let Some(a) = it.next() {
             if let Some((k, v)) = a.split_once('=').filter(|(k, _)| k.starts_with("--")) {
@@ -205,6 +211,9 @@ fn json_escape(s: &str) -> String {
 
 fn stats(args: &Args) -> Result<(), String> {
     let (_, c) = open(args)?;
+    if let Some(group) = args.value("--keys") {
+        return keys(args, &c, group);
+    }
     let s = c.stats();
     let counters: Vec<(&str, u64)> = vec![
         ("hits", s.hits),
@@ -311,22 +320,105 @@ fn stats(args: &Args) -> Result<(), String> {
         );
     }
     if let Some(gs) = groups {
+        let rows = view::aggregate(&gs);
+        let shown = if args.flag("--all") {
+            rows.len()
+        } else {
+            rows.len().min(TOP)
+        };
         println!();
         println!(
-            "  {:<18} {:<28} {:>10} {:>12} {:>10}",
-            "namespace", "group", "entries", "memory", "stale"
+            "  {:<18} {:<32} {:>7} {:>9} {:>11} {:>7}",
+            "namespace", "group", "groups", "entries", "memory", "stale"
         );
-        for g in gs {
-            let ns: String = g.namespace.chars().take(18).collect();
+        for r in &rows[..shown] {
             println!(
-                "  {:<18} {:<28} {:>10} {:>12} {:>10}",
-                ns,
-                g.name,
-                g.entries,
-                format_size(g.bytes),
-                g.stale_entries
+                "  {:<18} {:<32} {:>7} {:>9} {:>11} {:>7}",
+                cut(&r.namespace, 18),
+                cut(&r.name, 32),
+                r.groups,
+                r.entries,
+                format_size(r.bytes),
+                r.stale
             );
         }
+        if shown < rows.len() {
+            println!("  … {} more rows (--all lists them)", rows.len() - shown);
+        }
+    }
+    Ok(())
+}
+
+/// Rows printed by `--groups` and `--keys` unless `--all` is given.
+const TOP: usize = 30;
+
+fn cut(s: &str, n: usize) -> String {
+    if s.chars().count() <= n {
+        s.to_string()
+    } else {
+        let mut o: String = s.chars().take(n - 1).collect();
+        o.push('…');
+        o
+    }
+}
+
+/// `stats --keys GROUP`: the largest keys of a group, read from the segment.
+fn keys(args: &Args, c: &Cache, group: &str) -> Result<(), String> {
+    let found: Vec<(String, wprc_core::KeyUsage)> = match args.value("--namespace") {
+        Some(ns) => c
+            .group_keys(ns.as_bytes(), group.as_bytes())
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|k| (ns.to_string(), k))
+            .collect(),
+        None => c
+            .find_group_keys(group.as_bytes())
+            .map_err(|e| e.to_string())?,
+    };
+    if found.is_empty() {
+        println!("No keys in group {group:?}.");
+        return Ok(());
+    }
+    let now = wprc_core::now_secs();
+    let total: u64 = found.iter().map(|(_, k)| k.alloc as u64).sum();
+    let shown = if args.flag("--all") {
+        found.len()
+    } else {
+        found.len().min(TOP)
+    };
+    println!(
+        "Group {group}: {} keys, {}\n",
+        found.len(),
+        format_size(total)
+    );
+    println!(
+        "  {:<18} {:<44} {:>5} {:<10} {:>10} {:>10} {:>8}",
+        "namespace", "key", "blog", "type", "value", "memory", "ttl"
+    );
+    for (ns, k) in &found[..shown] {
+        let ttl = match k.expires {
+            0 => "-".to_string(),
+            e if e <= now => "expired".to_string(),
+            e => format!("{}s", e - now),
+        };
+        println!(
+            "  {:<18} {:<44} {:>5} {:<10} {:>10} {:>10} {:>8}{}",
+            cut(ns, 18),
+            cut(&String::from_utf8_lossy(&k.key), 44),
+            k.blog,
+            wprc_core::value::tag_name(k.tag),
+            format_size(k.value_len as u64),
+            format_size(k.alloc as u64),
+            ttl,
+            if k.live {
+                ""
+            } else {
+                "  (flushed, awaiting reclamation)"
+            }
+        );
+    }
+    if shown < found.len() {
+        println!("  … {} more keys (--all lists them)", found.len() - shown);
     }
     Ok(())
 }
@@ -493,14 +585,16 @@ fn prometheus(s: &Stats, groups: Option<&[wprc_core::GroupUsage]>) -> String {
     if let Some(gs) = groups {
         let _ = writeln!(o, "# HELP wp_rust_cache_group_bytes Bytes held per group.");
         let _ = writeln!(o, "# TYPE wp_rust_cache_group_bytes gauge");
-        for g in gs {
+        // Numbered groups (one per WooCommerce product) are folded into
+        // families: one label per product would explode the series count.
+        for r in view::aggregate(gs) {
             let esc = |v: &str| v.replace('\\', "\\\\").replace('"', "\\\"");
             let _ = writeln!(
                 o,
                 "wp_rust_cache_group_bytes{{namespace=\"{}\",group=\"{}\"}} {}",
-                esc(&g.namespace),
-                esc(&g.name),
-                g.bytes
+                esc(&r.namespace),
+                esc(&r.name),
+                r.bytes
             );
         }
     }

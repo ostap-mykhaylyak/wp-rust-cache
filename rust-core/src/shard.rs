@@ -123,6 +123,9 @@ pub struct Found {
 pub struct Walked<'k> {
     pub key: &'k [u8],
     pub alloc: u32,
+    pub tag: u8,
+    pub value_len: u32,
+    pub expires: u32,
 }
 
 impl Ctx<'_> {
@@ -871,10 +874,12 @@ impl Ctx<'_> {
         let mut steps = 0u64;
         while cur != 0 {
             let (klen, vlen, size) = self.dims(cur)?;
-            let _ = vlen;
             f(Walked {
                 key: self.bytes(cur + E_DATA, klen),
                 alloc: size,
+                tag: self.tag(cur),
+                value_len: vlen,
+                expires: self.r32(cur + E_EXPIRES),
             });
             cur = self.r32(cur + E_LNEXT);
             steps += 1;
