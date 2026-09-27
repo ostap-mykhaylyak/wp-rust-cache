@@ -7,6 +7,10 @@ PHP="$1"
 CLI="${WPRC_CLI:-}"
 log=$(mktemp)
 
+# The segment may already count resets from an earlier run: compare with
+# the count now.
+base=$($PHP -r '$s = wp_rust_cache_stats(); echo $s ? $s["recoveries"] : 0;')
+
 # Writing 256 KB values to one key keeps the writer inside that key's shard
 # lock much of the time, so a kill -9 soon lands there. Retry until it does.
 for attempt in $(seq 1 40); do
@@ -28,13 +32,13 @@ for attempt in $(seq 1 40); do
 		$s = wp_rust_cache_stats();
 		echo $s["recoveries"], "\n";
 	' > /tmp/recoveries 2>/dev/null
-	if [ "$(cat /tmp/recoveries)" -gt 0 ] 2>/dev/null; then
+	if [ "$(cat /tmp/recoveries)" -gt "$base" ] 2>/dev/null; then
 		break
 	fi
 done
 
 fail=0
-if [ "$(cat /tmp/recoveries)" -gt 0 ] 2>/dev/null; then
+if [ "$(cat /tmp/recoveries)" -gt "$base" ] 2>/dev/null; then
 	echo "  ok    lock owner killed on attempt $attempt, shard reset"
 else
 	echo "  FAIL  no kill landed inside a lock in 40 attempts"
